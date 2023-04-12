@@ -33,10 +33,10 @@ const LINK_REQUEST_ID = 'swg-link';
  */
 export class LinkbackFlow {
   /**
-   * @param {!./deps.DepsDef} deps
+   * @param {!./deps.Deps} deps
    */
   constructor(deps) {
-    /** @private @const {!./deps.DepsDef} */
+    /** @private @const {!./deps.Deps} */
     this.deps_ = deps;
 
     /** @private @const {!../components/activities.ActivityPorts} */
@@ -84,7 +84,7 @@ export class LinkbackFlow {
  */
 export class LinkCompleteFlow {
   /**
-   * @param {!./deps.DepsDef} deps
+   * @param {!./deps.Deps} deps
    */
   static configurePending(deps) {
     /**
@@ -136,18 +136,15 @@ export class LinkCompleteFlow {
   }
 
   /**
-   * @param {!./deps.DepsDef} deps
+   * @param {!./deps.Deps} deps
    * @param {?Object} response
    */
   constructor(deps, response) {
-    /** @private @const {!./deps.DepsDef} */
+    /** @private @const {!./deps.Deps} */
     this.deps_ = deps;
 
     /** @private @const {!Window} */
     this.win_ = deps.win();
-
-    /** @private @const {!./client-config-manager.ClientConfigManager} */
-    this.clientConfigManager_ = deps.clientConfigManager();
 
     /** @private @const {!../components/activities.ActivityPorts} */
     this.activityPorts_ = deps.activities();
@@ -187,17 +184,11 @@ export class LinkCompleteFlow {
     }
 
     // Show confirmation.
-    const clientConfig = await this.clientConfigManager_.getClientConfig();
     const index = this.response_['index'] || '0';
     this.activityIframeView_ = new ActivityIframeView(
       this.win_,
       this.activityPorts_,
-      feUrl(
-        '/linkconfirmiframe',
-        {},
-        clientConfig.usePrefixedHostPath,
-        'u/' + index
-      ),
+      feUrl('/linkconfirmiframe', {}, 'u/' + index),
       feArgs({
         'productId': this.deps_.pageConfig().getProductId(),
         'publicationId': this.deps_.pageConfig().getPublicationId(),
@@ -230,7 +221,7 @@ export class LinkCompleteFlow {
       this.complete_(response, !!response['success']);
     } catch (reason) {
       // Rethrow async.
-      setTimeout(() => {
+      this.win_.setTimeout(() => {
         throw reason;
       });
     }
@@ -276,14 +267,14 @@ export class LinkCompleteFlow {
  */
 export class LinkSaveFlow {
   /**
-   * @param {!./deps.DepsDef} deps
+   * @param {!./deps.Deps} deps
    * @param {!../api/subscriptions.SaveSubscriptionRequestCallback} callback
    */
   constructor(deps, callback) {
     /** @private @const {!Window} */
     this.win_ = deps.win();
 
-    /** @private @const {!./deps.DepsDef} */
+    /** @private @const {!./deps.Deps} */
     this.deps_ = deps;
 
     /** @private @const {!../components/activities.ActivityPorts} */
@@ -331,7 +322,7 @@ export class LinkSaveFlow {
 
     // Handle linking failure.
     if (!result['linked']) {
-      throw createCancelError(this.win_, 'not linked');
+      throw createCancelError('not linked');
     }
 
     // Start link confirmation flow.

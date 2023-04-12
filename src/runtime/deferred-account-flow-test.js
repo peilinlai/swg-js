@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-import {ActivityPort} from '../components/activities';
 import {AnalyticsEvent} from '../proto/api_messages';
 import {ConfiguredRuntime} from './runtime';
 import {DeferredAccountFlow} from './deferred-account-flow';
 import {Entitlement, Entitlements} from '../api/entitlements';
+import {MockActivityPort} from '../../test/mock-activity-port';
 import {PageConfig} from '../model/page-config';
 import {PayCompleteFlow} from './pay-flow';
 
@@ -64,7 +64,7 @@ describes.realWin('DeferredAccountFlow', (env) => {
       entitlements: ents,
     });
 
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     resultResolver = null;
@@ -145,7 +145,7 @@ describes.realWin('DeferredAccountFlow', (env) => {
       .expects('openIframe')
       .withExactArgs(
         sandbox.match((arg) => arg.tagName == 'IFRAME'),
-        'https://news.google.com/swg/_/ui/v1/recoveriframe?_=_',
+        'https://news.google.com/swg/ui/v1/recoveriframe?_=_',
         {
           _client: 'SwG 0.0.0',
           publicationId: 'pub1',

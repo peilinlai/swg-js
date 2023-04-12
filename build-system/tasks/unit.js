@@ -16,15 +16,15 @@
 'use strict';
 
 const app = require('../server/test-server').app;
-const argv = require('minimist')(process.argv.slice(2));
+const args = require('./args');
 const config = require('../config');
-const glob = require('glob');
 const gulp = require('gulp-help')(require('gulp'));
 const Karma = require('karma').Server;
 const karmaDefault = require('./karma.conf');
 const log = require('fancy-log');
 const shuffleSeed = require('shuffle-seed');
 const webserver = require('gulp-webserver');
+const {globSync} = require('glob');
 const {green, yellow, cyan, red} = require('ansi-colors');
 const {isCiBuild} = require('../ci');
 
@@ -33,16 +33,16 @@ const {isCiBuild} = require('../ci');
  * @return {!Object} Karma configuration
  */
 function getConfig() {
-  if (argv.safari) {
+  if (args.safari) {
     return Object.assign({}, karmaDefault, {browsers: ['Safari']});
   }
-  if (argv.firefox) {
+  if (args.firefox) {
     return Object.assign({}, karmaDefault, {browsers: ['Firefox']});
   }
-  if (argv.edge) {
+  if (args.edge) {
     return Object.assign({}, karmaDefault, {browsers: ['Edge']});
   }
-  if (argv.ie) {
+  if (args.ie) {
     return Object.assign({}, karmaDefault, {browsers: ['IE']});
   }
   return karmaDefault;
@@ -52,7 +52,7 @@ function getConfig() {
  * Prints help messages for args if tests are being run for local development.
  */
 function printArgvMessages() {
-  if (argv.nohelp || isCiBuild()) {
+  if (args.nohelp || isCiBuild()) {
     return;
   }
 
@@ -67,10 +67,10 @@ function printArgvMessages() {
       ' tests for that file to be re-run in the same browser instance.',
     verbose: 'Enabling verbose mode. Expect lots of output!',
     testnames: 'Listing the names of all tests being run.',
-    files: 'Running tests in the file(s): ' + cyan(argv.files),
+    files: 'Running tests in the file(s): ' + cyan(args.files),
     compiled: 'Running tests against minified code.',
     grep:
-      'Only running tests that match the pattern "' + cyan(argv.grep) + '".',
+      'Only running tests that match the pattern "' + cyan(args.grep) + '".',
     coverage: 'Running tests in code coverage mode.',
   };
 
@@ -81,7 +81,7 @@ function printArgvMessages() {
   );
   log(green('⤷ Use'), cyan('--nohelp'), green('to silence these messages.'));
 
-  if (!argv.testnames && !argv.files) {
+  if (!args.testnames && !args.files) {
     log(
       green('⤷ Use'),
       cyan('--testnames'),
@@ -89,13 +89,13 @@ function printArgvMessages() {
     );
   }
 
-  if (argv.compiled || !argv.nobuild) {
+  if (args.compiled || !args.nobuild) {
     log(green('Running tests against minified code.'));
   } else {
     log(green('Running tests against unminified code.'));
   }
 
-  for (const arg of Object.keys(argv)) {
+  for (const arg of Object.keys(args)) {
     const message = argvMessages[arg];
     if (message) {
       log(yellow('--' + arg + ':'), green(message));
@@ -108,13 +108,13 @@ function printArgvMessages() {
  * @param {!RuntimeTestConfig} c
  */
 function getUnitTestsToRun(c) {
-  if (argv.testnames) {
+  if (args.testnames) {
     c.reporters = ['mocha'];
     c.mochaReporter.output = 'full';
   }
 
-  if (argv.files) {
-    c.files = [].concat(config.commonTestPaths, argv.files);
+  if (args.files) {
+    c.files = [].concat(config.commonTestPaths, args.files);
     c.reporters = ['mocha'];
     c.mochaReporter.output = 'full';
   } else {
@@ -122,10 +122,10 @@ function getUnitTestsToRun(c) {
 
     let testFiles = [];
     for (const index in unitTestPaths) {
-      testFiles = testFiles.concat(glob.sync(unitTestPaths[index]));
+      testFiles = testFiles.concat(globSync(unitTestPaths[index]));
     }
 
-    const seed = argv.seed || Math.random();
+    const seed = args.seed || Math.random();
     log(
       yellow('Running tests in randomized order.'),
       yellow('To rerun same ordering, use command'),
@@ -144,30 +144,30 @@ function getUnitTestsToRun(c) {
 function runTests() {
   const c = getConfig();
 
-  c.singleRun = !argv.watch && !argv.w;
-  c.client.captureConsole = !!argv.verbose || !!argv.v || !!argv.files;
+  c.singleRun = !args.watch && !args.w;
+  c.client.captureConsole = !!args.verbose || !!args.v || !!args.files;
 
   getUnitTestsToRun(c);
 
   // c.client is available in test browser via window.parent.karma.config
   c.client.subscriptions = {
-    useCompiledJs: !!argv.compiled,
+    useCompiledJs: !!args.compiled,
     mochaTimeout: c.client.mocha.timeout,
   };
 
-  if (argv.compiled) {
+  if (args.compiled) {
     process.env.SERVE_MODE = 'compiled';
   } else {
     process.env.SERVE_MODE = 'default';
   }
 
-  if (argv.grep) {
+  if (args.grep) {
     c.client.mocha = {
-      'grep': argv.grep,
+      'grep': args.grep,
     };
   }
 
-  if (argv.coverage) {
+  if (args.coverage) {
     c.reporters.push('coverage-istanbul');
     c.plugins.push('karma-coverage-istanbul-reporter');
 
@@ -181,13 +181,16 @@ function runTests() {
       'istanbul',
       {
         exclude: [
-          'build-system/**/*.js',
-          'src/**/*-test.js',
-          'test/**/*.js',
-          'third_party/**/*.js',
+          'build-system/**/*',
+          'src/**/*-test.{js,ts}',
+          'src/**/*.stories.{js,ts}',
+          'test/**/*',
+          'third_party/**/*',
+          // This file is auto-generated.
+          'src/proto/api_messages.ts',
           // Tell istanbul not to instrument the constants file.
           // This is needed because we update it at build time for tests.
-          'src/constants.js',
+          'src/constants.ts',
         ],
       },
     ];

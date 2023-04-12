@@ -15,7 +15,7 @@
  */
 'use strict';
 
-const argv = require('minimist')(process.argv.slice(2));
+const args = require('./args');
 const {isCiBuild} = require('../ci');
 
 /**
@@ -25,29 +25,20 @@ module.exports = {
   frameworks: ['fixture', 'browserify', 'mocha', 'sinon-chai', 'chai'],
 
   preprocessors: {
-    'src/**/*.js': ['browserify'],
-    'test/**/*.js': ['browserify'],
+    '{src,test}/**/*.{js,ts}': ['browserify'],
   },
 
   browserify: {
     watch: true,
     debug: true,
     fast: true,
+    plugin: ['tsify'],
     transform: [
       [
         'babelify',
         {
           presets: ['@babel/preset-env'],
-          plugins: [
-            [
-              './build-system/transform-define-constants',
-              {
-                'replacements': {
-                  'PAY_ENVIRONMENT': 'TEST',
-                },
-              },
-            ],
-          ],
+          extensions: ['.js', '.ts'],
         },
       ],
     ],
@@ -101,7 +92,7 @@ module.exports = {
   autoWatch: true,
 
   browsers: [
-    argv.headless ? 'Chrome_no_extensions_headless' : 'Chrome_no_extensions',
+    args.headless ? 'Chrome_no_extensions_headless' : 'Chrome_no_extensions',
   ],
 
   // Number of sauce tests to start in parallel

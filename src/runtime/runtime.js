@@ -30,7 +30,7 @@ import {ClientConfigManager} from './client-config-manager';
 import {ClientEventManager} from './client-event-manager';
 import {ContributionsFlow} from './contributions-flow';
 import {DeferredAccountFlow} from './deferred-account-flow';
-import {DepsDef} from './deps';
+import {Deps as DepsDef} from './deps';
 import {DialogManager} from '../components/dialog-manager';
 import {Doc as DocInterface, resolveDoc} from '../model/doc';
 import {EntitlementsManager} from './entitlements-manager';
@@ -174,7 +174,12 @@ export class Runtime {
     this.productOrPublicationId_ = null;
 
     /** @private @const {!../api/subscriptions.Config} */
-    this.config_ = {};
+    this.config_ = {
+      useArticleEndpoint: isExperimentOn(
+        win,
+        ExperimentFlags.USE_ARTICLE_ENDPOINT_CLASSIC
+      ),
+    };
 
     /** @private {boolean} */
     this.startedConfiguringRuntime_ = false;
@@ -229,7 +234,10 @@ export class Runtime {
     const configuredRuntime = new ConfiguredRuntime(
       this.doc_,
       pageConfig,
-      /* integr */ {configPromise: this.configuredRuntimePromise_},
+      /* integr */ {
+        configPromise: this.configuredRuntimePromise_,
+        useArticleEndpoint: this.config_.useArticleEndpoint || false,
+      },
       this.config_
     );
     this.configuredRuntimeResolver_(configuredRuntime);
@@ -624,7 +632,7 @@ export class ConfiguredRuntime {
     this.activityPorts_ = new ActivityPorts(this);
 
     /** @private @const {!AnalyticsService} */
-    this.analyticsService_ = new AnalyticsService(this, this.fetcher_);
+    this.analyticsService_ = new AnalyticsService(this);
 
     /** @private @const {!PayClient} */
     this.payClient_ = new PayClient(this);
@@ -796,17 +804,20 @@ export class ConfiguredRuntime {
           break;
         case 'enableSwgAnalytics':
           if (!isBoolean(value)) {
-            error = 'Unknown enableSwgAnalytics value: ' + value;
+            error =
+              'enableSwgAnalytics must be a boolean, type: ' + typeof value;
           }
           break;
         case 'enablePropensity':
           if (!isBoolean(value)) {
-            error = 'Unknown enablePropensity value: ' + value;
+            error = 'enablePropensity must be a boolean, type: ' + typeof value;
           }
           break;
         case 'skipAccountCreationScreen':
           if (!isBoolean(value)) {
-            error = 'Unknown skipAccountCreationScreen value: ' + value;
+            error =
+              'skipAccountCreationScreen must be a boolean, type: ' +
+              typeof value;
           }
           break;
         case 'publisherProvidedId':
@@ -815,6 +826,12 @@ export class ConfiguredRuntime {
             !(typeof value === 'string' && value != '')
           ) {
             error = 'publisherProvidedId must be a string, value: ' + value;
+          }
+          break;
+        case 'useArticleEndpoint':
+          if (!isBoolean(value)) {
+            error =
+              'useArticleEndpoint must be a boolean, type: ' + typeof value;
           }
           break;
         default:
@@ -906,10 +923,6 @@ export class ConfiguredRuntime {
 
   /** @override */
   async showUpdateOffers(options) {
-    assert(
-      isExperimentOn(this.win_, ExperimentFlags.REPLACE_SUBSCRIPTION),
-      'Not yet launched!'
-    );
     await this.documentParsed_;
     const errorMessage =
       'The showUpdateOffers() method cannot be used for new subscribers. ' +
@@ -1021,10 +1034,6 @@ export class ConfiguredRuntime {
 
   /** @override */
   async updateSubscription(subscriptionRequest) {
-    assert(
-      isExperimentOn(this.win_, ExperimentFlags.REPLACE_SUBSCRIPTION),
-      'Not yet launched!'
-    );
     const errorMessage =
       'The updateSubscription() method should be used for subscription ' +
       'updates; for new subscriptions please use the subscribe() method';
@@ -1082,10 +1091,6 @@ export class ConfiguredRuntime {
 
   /** @override */
   attachSmartButton(button, optionsOrCallback, callback) {
-    assert(
-      isExperimentOn(this.win_, ExperimentFlags.SMARTBOX),
-      'Not yet launched!'
-    );
     this.buttonApi_.attachSmartButton(
       this,
       button,

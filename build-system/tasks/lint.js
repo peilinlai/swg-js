@@ -16,7 +16,7 @@
  */
 'use strict';
 
-const argv = require('minimist')(process.argv.slice(2));
+const args = require('./args');
 const config = require('../config');
 const eslint = require('../../third_party/gulp-eslint');
 const eslintIfFixed = require('gulp-eslint-if-fixed');
@@ -30,7 +30,7 @@ const {gitDiffNameOnlyMain} = require('../git');
 const {green, yellow, cyan, red} = require('ansi-colors');
 const {isCiBuild} = require('../ci');
 
-const isWatching = argv.watch || argv.w || false;
+const isWatching = args.watch || args.w || false;
 const options = {
   fix: false,
 };
@@ -76,6 +76,10 @@ function runLinter(filePath, stream, options) {
   if (!isCiBuild()) {
     log(green('Starting linter...'));
   }
+
+  // Load custom rules.
+  options.rulePaths = ['build-system/eslint-rules'];
+
   const fixedFiles = {};
   return stream
     .pipe(eslint(options))
@@ -154,13 +158,13 @@ function runLinter(filePath, stream, options) {
 }
 
 /**
- * Extracts the list of JS files in this PR from the commit log.
+ * Extracts the list of JS and TS files in this PR from the commit log.
  *
  * @return {!Array<string>}
  */
-function jsFilesChanged() {
+function scriptFilesChanged() {
   return gitDiffNameOnlyMain().filter((file) => {
-    return fs.existsSync(file) && path.extname(file) == '.js';
+    return fs.existsSync(file) && ['.js', '.ts'].includes(path.extname(file));
   });
 }
 
@@ -203,21 +207,21 @@ function setFilesToLint(files) {
  * @return {!Stream} Readable stream
  */
 function lint() {
-  if (argv.fix) {
+  if (args.fix) {
     options.fix = true;
   }
-  if (argv.files) {
-    setFilesToLint(argv.files.split(','));
+  if (args.files) {
+    setFilesToLint(args.files.split(','));
   } else if (
     !eslintRulesChanged() &&
-    (process.env.LOCAL_PR_CHECK || argv.local_changes)
+    (process.env.LOCAL_PR_CHECK || args.local_changes)
   ) {
-    const jsFiles = jsFilesChanged();
-    if (jsFiles.length == 0) {
-      log(green('INFO: ') + 'No JS files in this PR');
+    const scriptFiles = scriptFilesChanged();
+    if (scriptFiles.length == 0) {
+      log(green('INFO: ') + 'No JS or TS files in this PR');
       return Promise.resolve();
     }
-    setFilesToLint(jsFiles);
+    setFilesToLint(scriptFiles);
   }
   const basePath = '.';
   const stream = initializeStream(config.lintGlobs, {base: basePath});

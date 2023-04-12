@@ -16,7 +16,6 @@
 
 import {AudienceActivityEventListener} from './audience-activity-listener';
 import {AutoPromptManager} from './auto-prompt-manager';
-import {AutoPromptType} from '../api/basic-subscriptions';
 import {ButtonApi, ButtonAttributeValues} from './button-api';
 import {ConfiguredRuntime} from './runtime';
 import {Constants} from '../utils/constants';
@@ -229,6 +228,7 @@ export class BasicRuntime {
     this.setupAndShowAutoPrompt({
       autoPromptType,
       alwaysShow,
+      isAccessibleForFree,
     });
     this.setOnLoginRequest();
     this.processEntitlements();
@@ -264,12 +264,6 @@ export class BasicRuntime {
     runtime.dismissSwgUI();
   }
 
-  /** @override */
-  async linkSubscription(request) {
-    const runtime = await this.configured_(false);
-    return runtime.linkSubscription(request);
-  }
-
   /**
    * Sets up all the buttons on the page with attribute
    * 'swg-standard-button:subscription' or 'swg-standard-button:contribution'.
@@ -288,7 +282,7 @@ export class BasicRuntime {
 
 /**
  * @implements  {../api/basic-subscriptions.BasicSubscriptions}
- * @implements {./deps.DepsDef}
+ * @implements {./deps.Deps}
  */
 export class ConfiguredBasicRuntime {
   /**
@@ -313,10 +307,7 @@ export class ConfiguredBasicRuntime {
     integr.configPromise = integr.configPromise || Promise.resolve();
     integr.fetcher = integr.fetcher || new XhrFetcher(this.win_);
     integr.enableGoogleAnalytics = true;
-    integr.useArticleEndpoint = isExperimentOn(
-      this.win_,
-      ExperimentFlags.USE_ARTICLE_ENDPOINT
-    );
+    integr.useArticleEndpoint = true;
 
     /** @private @const {!./fetcher.Fetcher} */
     this.fetcher_ = integr.fetcher;
@@ -373,7 +364,10 @@ export class ConfiguredBasicRuntime {
     }
 
     /** @private @const {!AutoPromptManager} */
-    this.autoPromptManager_ = new AutoPromptManager(this);
+    this.autoPromptManager_ = new AutoPromptManager(
+      this,
+      this.configuredClassicRuntime_
+    );
 
     /** @private @const {!ButtonApi} */
     this.buttonApi_ = new ButtonApi(
@@ -574,25 +568,6 @@ export class ConfiguredBasicRuntime {
 
   /** @override */
   setupAndShowAutoPrompt(options) {
-    if (
-      options.autoPromptType === AutoPromptType.SUBSCRIPTION ||
-      options.autoPromptType == AutoPromptType.SUBSCRIPTION_LARGE
-    ) {
-      options.displayLargePromptFn = () => {
-        this.configuredClassicRuntime_.showOffers({
-          isClosable: !this.pageConfig().isLocked(),
-        });
-      };
-    } else if (
-      options.autoPromptType === AutoPromptType.CONTRIBUTION ||
-      options.autoPromptType == AutoPromptType.CONTRIBUTION_LARGE
-    ) {
-      options.displayLargePromptFn = () => {
-        this.configuredClassicRuntime_.showContributionOptions({
-          isClosable: !this.pageConfig().isLocked(),
-        });
-      };
-    }
     return this.autoPromptManager_.showAutoPrompt(options);
   }
 
@@ -639,11 +614,6 @@ export class ConfiguredBasicRuntime {
   setOnOffersFlowRequest_(callback) {
     this.callbacks().setOnOffersFlowRequest(callback);
   }
-
-  /** @override */
-  linkSubscription(request) {
-    return this.configuredClassicRuntime_.linkSubscription(request);
-  }
 }
 
 /**
@@ -661,6 +631,5 @@ function createPublicBasicRuntime(basicRuntime) {
     setupAndShowAutoPrompt:
       basicRuntime.setupAndShowAutoPrompt.bind(basicRuntime),
     dismissSwgUI: basicRuntime.dismissSwgUI.bind(basicRuntime),
-    linkSubscription: basicRuntime.linkSubscription.bind(basicRuntime),
   });
 }

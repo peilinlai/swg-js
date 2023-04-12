@@ -27,7 +27,6 @@ import {
   ProductType,
   ReplaceSkuProrationMode,
   ShowcaseEvent,
-  Subscriptions,
 } from '../api/subscriptions';
 import {AnalyticsService} from './analytics-service';
 import {ClientConfigManager} from './client-config-manager';
@@ -44,7 +43,6 @@ import {DialogManager} from '../components/dialog-manager';
 import {Entitlement, Entitlements} from '../api/entitlements';
 import {Event} from '../api/logger-api';
 import {ExperimentFlags} from './experiment-flags';
-import {Fetcher, XhrFetcher} from './fetcher';
 import {GlobalDoc} from '../model/doc';
 import {JsError} from './jserror';
 import {
@@ -63,6 +61,7 @@ import {Propensity} from './propensity';
 import {SubscribeResponse} from '../api/subscribe-response';
 import {SubscriptionLinkingFlow} from './subscription-linking-flow';
 import {WaitForSubscriptionLookupApi} from './wait-for-subscription-lookup-api';
+import {XhrFetcher} from './fetcher';
 import {analyticsEventToGoogleAnalyticsEvent} from './event-type-mapping';
 import {createElement} from '../utils/dom';
 import {
@@ -132,6 +131,7 @@ describes.realWin('installRuntime', (env) => {
     expect(getRuntime()).to.equal(runtime1);
   });
 
+  // TODO(b/274686315): Delete this test after the TypeScript migration.
   it('implements Subscriptions interface', async () => {
     const promise = new Promise((resolve) => {
       dep(resolve);
@@ -139,9 +139,52 @@ describes.realWin('installRuntime', (env) => {
     installRuntime(win);
 
     const subscriptions = await promise;
-    const keys = Object.getOwnPropertyNames(Subscriptions.prototype);
+    const keys = [
+      'init',
+      'configure',
+      'start',
+      'reset',
+      'clear',
+      'getEntitlements',
+      'setOnEntitlementsResponse',
+      'getOffers',
+      'showOffers',
+      'showUpdateOffers',
+      'showSubscribeOption',
+      'showAbbrvOffer',
+      'showContributionOptions',
+      'setOnNativeSubscribeRequest',
+      'setOnSubscribeResponse',
+      'subscribe',
+      'updateSubscription',
+      'setOnContributionResponse',
+      'setOnPaymentResponse',
+      'contribute',
+      'completeDeferredAccountCreation',
+      'setOnLoginRequest',
+      'triggerLoginRequest',
+      'showLoginPrompt',
+      'showLoginNotification',
+      'setOnLinkComplete',
+      'waitForSubscriptionLookup',
+      'linkAccount',
+      'setOnFlowStarted',
+      'setOnFlowCanceled',
+      'saveSubscription',
+      'linkSubscription',
+      'createButton',
+      'attachButton',
+      'attachSmartButton',
+      'getPropensityModule',
+      'getLogger',
+      'getEventManager',
+      'setShowcaseEntitlement',
+      'consumeShowcaseEntitlementJwt',
+      'showBestAudienceAction',
+      'setPublisherProvidedId',
+    ];
     for (const key of keys) {
-      expect(subscriptions[key]).to.exist;
+      expect(subscriptions).to.have.property(key);
     }
   });
 
@@ -183,22 +226,6 @@ describes.realWin('installRuntime', (env) => {
     await getRuntime().whenReady();
     await getRuntime().whenReady();
     expect(progress).to.equal('123');
-  });
-
-  it('implements all APIs', async () => {
-    installRuntime(win);
-
-    const subscriptions = await new Promise((resolve) => {
-      dep(resolve);
-    });
-
-    const names = Object.getOwnPropertyNames(Subscriptions.prototype);
-    for (const name of names) {
-      if (name == 'constructor') {
-        continue;
-      }
-      expect(subscriptions).to.have.property(name);
-    }
   });
 });
 
@@ -369,6 +396,29 @@ describes.realWin('Runtime', (env) => {
       const configuredRuntime = await runtime.configured_(true);
       const analytics = configuredRuntime.analytics();
       expect(analytics.readyForLogging_).to.be.true;
+    });
+
+    it('sets article endpoint off by default', async () => {
+      runtime.init('pub2');
+      const configuredRuntime = await runtime.configured_(true);
+      const entitlementsManager = configuredRuntime.entitlementsManager();
+      expect(entitlementsManager.useArticleEndpoint_).to.be.false;
+    });
+
+    it('sets article endpoint on when experiment is enabled', async () => {
+      setExperiment(win, ExperimentFlags.USE_ARTICLE_ENDPOINT_CLASSIC, true);
+      runtime = new Runtime(win);
+      const configuredRuntime = await runtime.configured_(true);
+      const entitlementsManager = configuredRuntime.entitlementsManager();
+      expect(entitlementsManager.useArticleEndpoint_).to.be.true;
+    });
+
+    it('sets article endpoint on', async () => {
+      runtime.configure({useArticleEndpoint: true});
+      runtime.init('pub2');
+      const configuredRuntime = await runtime.configured_(true);
+      const entitlementsManager = configuredRuntime.entitlementsManager();
+      expect(entitlementsManager.useArticleEndpoint_).to.be.true;
     });
   });
 
@@ -835,7 +885,7 @@ describes.realWin('Runtime', (env) => {
 
     it('should override fetcher', async () => {
       const ents = {};
-      const otherFetcher = new Fetcher();
+      const otherFetcher = new XhrFetcher(env.win);
       const fetchStub = sandbox
         .stub(otherFetcher, 'fetchCredentialedJson')
         .callsFake(() => Promise.resolve(ents));
@@ -853,7 +903,11 @@ describes.realWin('Runtime', (env) => {
     });
 
     it('should return propensity module', async () => {
-      const propensity = new Propensity(win, configuredRuntime, new Fetcher());
+      const propensity = new Propensity(
+        win,
+        configuredRuntime,
+        new XhrFetcher(env.win)
+      );
       configuredRuntimeMock
         .expects('getPropensityModule')
         .once()
@@ -1303,6 +1357,35 @@ describes.realWin('ConfiguredRuntime', (env) => {
           runtime.configure({publisherProvidedId: ''});
         }).to.throw(/publisherProvidedId must be a string, value: /);
       });
+
+      it('throws on unknown enableSwgAnalytics value', () => {
+        const mistake = () => runtime.configure({enableSwgAnalytics: 'true'});
+        expect(mistake).to.throw(
+          'enableSwgAnalytics must be a boolean, type: string'
+        );
+      });
+
+      it('throws on unknown enablePropensity value', () => {
+        const mistake = () => runtime.configure({enablePropensity: 'true'});
+        expect(mistake).to.throw(
+          'enablePropensity must be a boolean, type: string'
+        );
+      });
+
+      it('throws on unknown skipAccountCreationScreen value', () => {
+        const mistake = () =>
+          runtime.configure({skipAccountCreationScreen: 'true'});
+        expect(mistake).to.throw(
+          'skipAccountCreationScreen must be a boolean, type: string'
+        );
+      });
+
+      it('throws on unknown useArticleEndpoint value', () => {
+        const mistake = () => runtime.configure({useArticleEndpoint: 'true'});
+        expect(mistake).to.throw(
+          'useArticleEndpoint must be a boolean, type: string'
+        );
+      });
     });
 
     it('should prefetch loading indicator', () => {
@@ -1558,7 +1641,6 @@ a subscription. Use the showUpdateOffers() method instead.'
     });
 
     it('should call "showUpdateOffers"', async () => {
-      setExperiment(win, ExperimentFlags.REPLACE_SUBSCRIPTION, true);
       await expect(runtime.showUpdateOffers()).to.be.rejectedWith(
         'The showUpdateOffers() method cannot be used for \
 new subscribers. Use the showOffers() method instead.'
@@ -1566,7 +1648,6 @@ new subscribers. Use the showOffers() method instead.'
     });
 
     it('should call "showUpdateOffers" with options', async () => {
-      setExperiment(win, ExperimentFlags.REPLACE_SUBSCRIPTION, true);
       let offersFlow;
       sandbox.stub(OffersFlow.prototype, 'start').callsFake(function () {
         offersFlow = this;
@@ -1580,7 +1661,6 @@ new subscribers. Use the showOffers() method instead.'
     });
 
     it('should throw an error if showUpdateOffers is used without an oldSku', async () => {
-      setExperiment(win, ExperimentFlags.REPLACE_SUBSCRIPTION, true);
       await expect(
         runtime.showUpdateOffers({skuId: 'newSku'})
       ).to.be.rejectedWith(
@@ -1717,7 +1797,6 @@ updateSubscription() method'
     });
 
     it('throws if updateSubscription is used to initiate a new subscription', async () => {
-      setExperiment(win, ExperimentFlags.REPLACE_SUBSCRIPTION, true);
       await expect(
         runtime.updateSubscription({skuId: 'newSku'})
       ).to.eventually.be.rejectedWith(
@@ -1731,7 +1810,6 @@ subscribe() method'
       'should start PayStartFlow for replaceSubscription ' +
         '(no proration mode)',
       async () => {
-        setExperiment(win, ExperimentFlags.REPLACE_SUBSCRIPTION, true);
         let flowInstance;
         const startStub = sandbox
           .stub(PayStartFlow.prototype, 'start')
@@ -1750,7 +1828,6 @@ subscribe() method'
     );
 
     it('should start PayStartFlow for replaceSubscription', async () => {
-      setExperiment(win, ExperimentFlags.REPLACE_SUBSCRIPTION, true);
       let flowInstance;
       const startStub = sandbox
         .stub(PayStartFlow.prototype, 'start')
@@ -1993,8 +2070,6 @@ subscribe() method'
     });
 
     it('attaches smart button', async () => {
-      setExperiment(win, ExperimentFlags.SMARTBOX, true);
-
       const stub = sandbox.stub(runtime.buttonApi_, 'attachSmartButton');
 
       const args = [1, 2, 3];

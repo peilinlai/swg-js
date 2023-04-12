@@ -27,6 +27,7 @@ import {PayStartFlow} from './pay-flow';
 import {ProductType, SubscriptionFlows} from '../api/subscriptions';
 import {assert} from '../utils/log';
 import {feArgs, feUrl} from './services';
+import {parseQueryString} from '../utils/url';
 
 /**
  * @param {string} sku
@@ -50,11 +51,11 @@ const ALL_SKUS = '*';
  */
 export class OffersFlow {
   /**
-   * @param {!./deps.DepsDef} deps
+   * @param {!./deps.Deps} deps
    * @param {!../api/subscriptions.OffersRequest|undefined} options
    */
   constructor(deps, options) {
-    /** @private @const {!./deps.DepsDef} */
+    /** @private @const {!./deps.Deps} */
     this.deps_ = deps;
 
     /** @private @const {!Window} */
@@ -279,7 +280,11 @@ export class OffersFlow {
    */
   getUrl_(clientConfig, pageConfig) {
     if (!clientConfig.useUpdatedOfferFlows) {
-      return feUrl('/offersiframe');
+      const offerCardParam = parseQueryString(this.win_.location.hash)[
+        'swg.newoffercard'
+      ];
+      const params = offerCardParam ? {'useNewOfferCard': offerCardParam} : {};
+      return feUrl('/offersiframe', params);
     }
 
     const params = {'publicationId': pageConfig.getPublicationId()};
@@ -310,11 +315,11 @@ export class OffersFlow {
  */
 export class SubscribeOptionFlow {
   /**
-   * @param {!./deps.DepsDef} deps
+   * @param {!./deps.Deps} deps
    * @param {!../api/subscriptions.OffersRequest|undefined} options
    */
   constructor(deps, options) {
-    /** @private @const {!./deps.DepsDef} */
+    /** @private @const {!./deps.Deps} */
     this.deps_ = deps;
 
     /** @private @const {!../api/subscriptions.OffersRequest|undefined} */
@@ -406,11 +411,11 @@ export class SubscribeOptionFlow {
  */
 export class AbbrvOfferFlow {
   /**
-   * @param {!./deps.DepsDef} deps
+   * @param {!./deps.Deps} deps
    * @param {!../api/subscriptions.OffersRequest=} options
    */
   constructor(deps, options = {}) {
-    /** @private @const {!./deps.DepsDef} */
+    /** @private @const {!./deps.Deps} */
     this.deps_ = deps;
 
     /** @private @const {!../api/subscriptions.OffersRequest|undefined} */

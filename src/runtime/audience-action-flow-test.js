@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import {ActivityPort} from '../components/activities';
 import {
   AlreadySubscribedResponse,
   AnalyticsEvent,
@@ -31,11 +30,14 @@ import {AutoPromptType} from '../api/basic-subscriptions';
 import {ClientEventManager} from './client-event-manager';
 import {ConfiguredRuntime} from './runtime';
 import {Constants} from '../utils/constants';
+import {MockActivityPort} from '../../test/mock-activity-port';
 import {PageConfig} from '../model/page-config';
 import {ProductType} from '../api/subscriptions';
 import {Toast} from '../ui/toast';
+import {tick} from '../../test/tick';
 
 const WINDOW_LOCATION_DOMAIN = 'https://www.test.com';
+const WINDOW_INNER_HEIGHT = 424242;
 const CURRENT_TIME = 1615416442000;
 const EXPECTED_TIME_STRING = '1615416442000';
 
@@ -70,6 +72,14 @@ TEST_SURVEYDATATRANSFERREQUEST.setSurveyQuestionsList([
   TEST_SURVEYQUESTION_2,
 ]);
 
+const TEST_SURVEYANSWER_EMPTY = new SurveyAnswer();
+const TEST_SURVEYQUESTION_EMPTY = new SurveyQuestion();
+TEST_SURVEYQUESTION_EMPTY.setSurveyAnswersList([TEST_SURVEYANSWER_EMPTY]);
+const TEST_EMPTY_SURVEYDATATRANSFERREQUEST = new SurveyDataTransferRequest();
+TEST_EMPTY_SURVEYDATATRANSFERREQUEST.setSurveyQuestionsList([
+  TEST_SURVEYQUESTION_EMPTY,
+]);
+
 describes.realWin('AudienceActionFlow', (env) => {
   let win;
   let runtime;
@@ -91,6 +101,7 @@ describes.realWin('AudienceActionFlow', (env) => {
         location: {href: WINDOW_LOCATION_DOMAIN + '/page/1'},
         document: env.win.document,
         gtag: () => {},
+        innerHeight: WINDOW_INNER_HEIGHT,
       }
     );
     messageMap = {};
@@ -110,7 +121,7 @@ describes.realWin('AudienceActionFlow', (env) => {
     const eventManager = new ClientEventManager(Promise.resolve());
     eventManagerMock = sandbox.mock(eventManager);
     sandbox.stub(runtime, 'eventManager').callsFake(() => eventManager);
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     port.acceptResult = () => Promise.resolve();
@@ -122,6 +133,12 @@ describes.realWin('AudienceActionFlow', (env) => {
     sandbox.stub(runtime, 'win').returns(win);
     onCancelSpy = sandbox.spy();
     sandbox.useFakeTimers(CURRENT_TIME);
+    sandbox.stub(self.console, 'warn');
+  });
+
+  afterEach(() => {
+    eventManagerMock.verify();
+    self.console.warn.reset();
   });
 
   function setWinWithoutGtag() {
@@ -132,14 +149,32 @@ describes.realWin('AudienceActionFlow', (env) => {
   }
 
   [
-    {action: 'TYPE_REGISTRATION_WALL', path: 'regwalliframe'},
-    {action: 'TYPE_NEWSLETTER_SIGNUP', path: 'newsletteriframe'},
-    {action: 'TYPE_REWARDED_SURVEY', path: 'surveyiframe'},
-  ].forEach(({action, path}) => {
+    {
+      action: 'TYPE_REGISTRATION_WALL',
+      configurationId: 'reg_config',
+      path: 'regwalliframe',
+    },
+    {
+      action: 'TYPE_NEWSLETTER_SIGNUP',
+      configurationId: 'newsletter_config',
+      path: 'newsletteriframe',
+    },
+    {
+      action: 'TYPE_REWARDED_SURVEY',
+      configurationId: 'survey_config',
+      path: 'surveyiframe',
+    },
+    {
+      // undefined configurationId
+      action: 'TYPE_REWARDED_SURVEY',
+      path: 'surveyiframe',
+    },
+  ].forEach(({action, configurationId, path}) => {
     it(`opens an AudienceActionFlow constructed with params for ${action}`, async () => {
       sandbox.stub(runtime.storage(), 'get').resolves(null);
       const audienceActionFlow = new AudienceActionFlow(runtime, {
         action,
+        configurationId,
         onCancel: onCancelSpy,
         autoPromptType: AutoPromptType.SUBSCRIPTION,
       });
@@ -147,13 +182,16 @@ describes.realWin('AudienceActionFlow', (env) => {
         .expects('openIframe')
         .withExactArgs(
           sandbox.match((arg) => arg.tagName == 'IFRAME'),
-          `https://news.google.com/swg/_/ui/v1/${path}?_=_&origin=${encodeURIComponent(
+          `https://news.google.com/swg/ui/v1/${path}?_=_&origin=${encodeURIComponent(
             WINDOW_LOCATION_DOMAIN
-          )}&hl=en&isClosable=false`,
+          )}&configurationId=${
+            configurationId === undefined ? '' : configurationId
+          }&hl=en&isClosable=false`,
           {
             _client: 'SwG 0.0.0',
             productType: ProductType.SUBSCRIPTION,
             supportsEventManager: true,
+            windowHeight: WINDOW_INNER_HEIGHT,
           }
         )
         .resolves(port);
@@ -170,6 +208,7 @@ describes.realWin('AudienceActionFlow', (env) => {
     sandbox.stub(runtime.storage(), 'get').resolves(null);
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REGISTRATION_WALL',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -177,13 +216,14 @@ describes.realWin('AudienceActionFlow', (env) => {
       .expects('openIframe')
       .withExactArgs(
         sandbox.match((arg) => arg.tagName == 'IFRAME'),
-        `https://news.google.com/swg/_/ui/v1/regwalliframe?_=_&origin=${encodeURIComponent(
+        `https://news.google.com/swg/ui/v1/regwalliframe?_=_&origin=${encodeURIComponent(
           WINDOW_LOCATION_DOMAIN
-        )}&hl=pt-BR&isClosable=false`,
+        )}&configurationId=configId&hl=pt-BR&isClosable=false`,
         {
           _client: 'SwG 0.0.0',
           productType: ProductType.SUBSCRIPTION,
           supportsEventManager: true,
+          windowHeight: WINDOW_INNER_HEIGHT,
         }
       )
       .resolves(port);
@@ -197,6 +237,7 @@ describes.realWin('AudienceActionFlow', (env) => {
   it('calls the onCancel when an AudienceActionFlow is cancelled and one it provided', async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REGISTRATION_WALL',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
     });
     activitiesMock.expects('openIframe').resolves(port);
@@ -215,6 +256,7 @@ describes.realWin('AudienceActionFlow', (env) => {
   it('handles a CompleteAudienceActionResponse with regwall completed and opens a custom toast', async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REGISTRATION_WALL',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -258,6 +300,7 @@ describes.realWin('AudienceActionFlow', (env) => {
   it('handles a CompleteAudienceActionResponse with newsletter completed and opens a custom toast', async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_NEWSLETTER_SIGNUP',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -301,6 +344,7 @@ describes.realWin('AudienceActionFlow', (env) => {
   it('handles a CompleteAudienceActionResponse with regwall completed before and opens a basic toast', async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REGISTRATION_WALL',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -342,6 +386,7 @@ describes.realWin('AudienceActionFlow', (env) => {
   it('handles a CompleteAudienceActionResponse with regwall failure and opens a failure toast', async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REGISTRATION_WALL',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -386,6 +431,7 @@ describes.realWin('AudienceActionFlow', (env) => {
   it(`handles a CompleteAudienceActionResponse with newsletter not completed and opens a custom toast indicating that the user has completed the newsletter before`, async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_NEWSLETTER_SIGNUP',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -428,6 +474,7 @@ describes.realWin('AudienceActionFlow', (env) => {
   it(`handles a CompleteAudienceActionResponse with newsletter failure and opens a custom toast indicating that the sign up has failed`, async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_NEWSLETTER_SIGNUP',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -472,6 +519,7 @@ describes.realWin('AudienceActionFlow', (env) => {
   it('handles a CompleteAudienceActionResponse with survey completed and does not open a custom toast', async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REWARDED_SURVEY',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -503,6 +551,7 @@ describes.realWin('AudienceActionFlow', (env) => {
   it(`handles a CompleteAudienceActionResponse with survey already completed and does not open a custom toast.`, async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REWARDED_SURVEY',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -535,6 +584,7 @@ describes.realWin('AudienceActionFlow', (env) => {
   it(`handles a CompleteAudienceActionResponse with survey failure and does not open a custom toast.`, async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REWARDED_SURVEY',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -568,6 +618,7 @@ describes.realWin('AudienceActionFlow', (env) => {
     const loginStub = sandbox.stub(runtime.callbacks(), 'triggerLoginRequest');
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REGISTRATION_WALL',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -586,6 +637,7 @@ describes.realWin('AudienceActionFlow', (env) => {
   it('should send an empty EntitlementsResponse to show the no entitlement found toast on Activity iFrame view', async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REGISTRATION_WALL',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -606,9 +658,10 @@ describes.realWin('AudienceActionFlow', (env) => {
     activityIframeViewMock.verify();
   });
 
-  it(`handles a SurveyDataTransferRequest with successful logging`, async () => {
+  it(`handles a SurveyDataTransferRequest with successful Google Analytics logging`, async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REWARDED_SURVEY',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.CONTRIBUTION,
     });
@@ -674,13 +727,16 @@ describes.realWin('AudienceActionFlow', (env) => {
     const messageCallback = messageMap[TEST_SURVEYDATATRANSFERREQUEST.label()];
     messageCallback(TEST_SURVEYDATATRANSFERREQUEST);
 
+    await tick(10);
+
     activityIframeViewMock.verify();
   });
 
-  it(`handles a SurveyDataTransferRequest with failed logging`, async () => {
+  it(`handles a SurveyDataTransferRequest with failed Google Analytics logging`, async () => {
     setWinWithoutGtag();
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REWARDED_SURVEY',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.CONTRIBUTION,
     });
@@ -709,12 +765,255 @@ describes.realWin('AudienceActionFlow', (env) => {
     const messageCallback = messageMap[TEST_SURVEYDATATRANSFERREQUEST.label()];
     messageCallback(TEST_SURVEYDATATRANSFERREQUEST);
 
+    await tick(10);
+
     activityIframeViewMock.verify();
+  });
+
+  it(`handles a SurveyDataTransferRequest with successful onResult logging`, async () => {
+    const onResultMock = sandbox
+      .mock()
+      .withExactArgs(TEST_SURVEYDATATRANSFERREQUEST)
+      .resolves(true)
+      .once();
+
+    const audienceActionFlow = new AudienceActionFlow(runtime, {
+      action: 'TYPE_REWARDED_SURVEY',
+      configurationId: 'configId',
+      onCancel: onCancelSpy,
+      autoPromptType: AutoPromptType.CONTRIBUTION,
+      onResult: onResultMock,
+    });
+
+    activitiesMock.expects('openIframe').resolves(port);
+
+    eventManagerMock.expects('logEvent').withExactArgs({
+      eventType: AnalyticsEvent.EVENT_SURVEY_DATA_TRANSFER_COMPLETE,
+      eventOriginator: EventOriginator.SWG_CLIENT,
+      isFromUserAction: true,
+      additionalParameters: null,
+    });
+
+    await audienceActionFlow.start();
+
+    const successSurveyDataTransferResponse = new SurveyDataTransferResponse();
+    successSurveyDataTransferResponse.setSuccess(true);
+
+    const activityIframeViewMock = sandbox
+      .mock(audienceActionFlow.activityIframeView_)
+      .expects('execute')
+      .withExactArgs(successSurveyDataTransferResponse)
+      .once();
+
+    const messageCallback = messageMap[TEST_SURVEYDATATRANSFERREQUEST.label()];
+    messageCallback(TEST_SURVEYDATATRANSFERREQUEST);
+
+    await tick(10);
+
+    activityIframeViewMock.verify();
+    onResultMock.verify();
+  });
+
+  it(`handles a SurveyDataTransferRequest with failed onResult logging`, async () => {
+    const onResultMock = sandbox
+      .mock()
+      .withExactArgs(TEST_SURVEYDATATRANSFERREQUEST)
+      .resolves(false)
+      .once();
+
+    const audienceActionFlow = new AudienceActionFlow(runtime, {
+      action: 'TYPE_REWARDED_SURVEY',
+      configurationId: 'configId',
+      onCancel: onCancelSpy,
+      autoPromptType: AutoPromptType.CONTRIBUTION,
+      onResult: onResultMock,
+    });
+
+    activitiesMock.expects('openIframe').resolves(port);
+
+    eventManagerMock
+      .expects('logEvent')
+      .withExactArgs({
+        eventType: AnalyticsEvent.EVENT_SURVEY_DATA_TRANSFER_FAILED,
+        eventOriginator: EventOriginator.SWG_CLIENT,
+        isFromUserAction: false,
+        additionalParameters: null,
+      })
+      .once();
+
+    await audienceActionFlow.start();
+
+    const failSurveyDataTransferResponse = new SurveyDataTransferResponse();
+    failSurveyDataTransferResponse.setSuccess(false);
+
+    const activityIframeViewMock = sandbox
+      .mock(audienceActionFlow.activityIframeView_)
+      .expects('execute')
+      .withExactArgs(failSurveyDataTransferResponse)
+      .once();
+
+    const messageCallback = messageMap[TEST_SURVEYDATATRANSFERREQUEST.label()];
+    messageCallback(TEST_SURVEYDATATRANSFERREQUEST);
+
+    await tick(10);
+
+    activityIframeViewMock.verify();
+    onResultMock.verify();
+  });
+
+  it(`handles a SurveyDataTransferRequest with onResult logging exception`, async () => {
+    const onResultMock = sandbox
+      .mock()
+      .withExactArgs(TEST_SURVEYDATATRANSFERREQUEST)
+      .throws(new Error('Test Callback Exception'))
+      .once();
+
+    const audienceActionFlow = new AudienceActionFlow(runtime, {
+      action: 'TYPE_REWARDED_SURVEY',
+      configurationId: 'configId',
+      onCancel: onCancelSpy,
+      autoPromptType: AutoPromptType.CONTRIBUTION,
+      onResult: onResultMock,
+    });
+
+    activitiesMock.expects('openIframe').resolves(port);
+
+    eventManagerMock
+      .expects('logEvent')
+      .withExactArgs({
+        eventType: AnalyticsEvent.EVENT_SURVEY_DATA_TRANSFER_FAILED,
+        eventOriginator: EventOriginator.SWG_CLIENT,
+        isFromUserAction: false,
+        additionalParameters: null,
+      })
+      .once();
+
+    await audienceActionFlow.start();
+
+    const failSurveyDataTransferResponse = new SurveyDataTransferResponse();
+    failSurveyDataTransferResponse.setSuccess(false);
+
+    const activityIframeViewMock = sandbox
+      .mock(audienceActionFlow.activityIframeView_)
+      .expects('execute')
+      .withExactArgs(failSurveyDataTransferResponse)
+      .once();
+
+    const messageCallback = messageMap[TEST_SURVEYDATATRANSFERREQUEST.label()];
+    messageCallback(TEST_SURVEYDATATRANSFERREQUEST);
+
+    await tick(10);
+
+    expect(self.console.warn).to.have.been.calledWithExactly(
+      '[swg.js] Exception in publisher provided logging callback: Error: Test Callback Exception'
+    );
+    activityIframeViewMock.verify();
+    onResultMock.verify();
+  });
+
+  it(`handles a SurveyDataTransferRequest with onResult logging rejection`, async () => {
+    const onResultMock = sandbox
+      .mock()
+      .withExactArgs(TEST_SURVEYDATATRANSFERREQUEST)
+      .rejects(new Error('Test Callback Exception'))
+      .once();
+
+    const audienceActionFlow = new AudienceActionFlow(runtime, {
+      action: 'TYPE_REWARDED_SURVEY',
+      configurationId: 'configId',
+      onCancel: onCancelSpy,
+      autoPromptType: AutoPromptType.CONTRIBUTION,
+      onResult: onResultMock,
+    });
+
+    activitiesMock.expects('openIframe').resolves(port);
+
+    eventManagerMock
+      .expects('logEvent')
+      .withExactArgs({
+        eventType: AnalyticsEvent.EVENT_SURVEY_DATA_TRANSFER_FAILED,
+        eventOriginator: EventOriginator.SWG_CLIENT,
+        isFromUserAction: false,
+        additionalParameters: null,
+      })
+      .once();
+
+    await audienceActionFlow.start();
+
+    const failSurveyDataTransferResponse = new SurveyDataTransferResponse();
+    failSurveyDataTransferResponse.setSuccess(false);
+
+    const activityIframeViewMock = sandbox
+      .mock(audienceActionFlow.activityIframeView_)
+      .expects('execute')
+      .withExactArgs(failSurveyDataTransferResponse)
+      .once();
+
+    const messageCallback = messageMap[TEST_SURVEYDATATRANSFERREQUEST.label()];
+    messageCallback(TEST_SURVEYDATATRANSFERREQUEST);
+
+    await tick(10);
+
+    expect(self.console.warn).to.have.been.calledWithExactly(
+      '[swg.js] Exception in publisher provided logging callback: Error: Test Callback Exception'
+    );
+    activityIframeViewMock.verify();
+    onResultMock.verify();
+  });
+
+  it(`handles an empty SurveyDataTransferRequest without onResult logging`, async () => {
+    eventManagerMock
+      .expects('logEvent')
+      .withExactArgs(
+        {
+          eventType: AnalyticsEvent.ACTION_SURVEY_DATA_TRANSFER,
+          eventOriginator: EventOriginator.SWG_CLIENT,
+          isFromUserAction: true,
+          additionalParameters: null,
+        },
+        {
+          googleAnalyticsParameters: {
+            'event_category': '',
+            'event_label': '',
+            'survey_question': '',
+            'survey_answer_category': '',
+          },
+        }
+      )
+      .once();
+
+    const audienceActionFlow = new AudienceActionFlow(runtime, {
+      action: 'TYPE_REWARDED_SURVEY',
+      configurationId: 'configId',
+      onCancel: onCancelSpy,
+      autoPromptType: AutoPromptType.CONTRIBUTION,
+    });
+
+    activitiesMock.expects('openIframe').resolves(port);
+
+    eventManagerMock.expects('logEvent').withExactArgs({
+      eventType: AnalyticsEvent.EVENT_SURVEY_DATA_TRANSFER_COMPLETE,
+      eventOriginator: EventOriginator.SWG_CLIENT,
+      isFromUserAction: true,
+      additionalParameters: null,
+    });
+
+    await audienceActionFlow.start();
+
+    const successSurveyDataTransferResponse = new SurveyDataTransferResponse();
+    successSurveyDataTransferResponse.setSuccess(true);
+
+    const messageCallback =
+      messageMap[TEST_EMPTY_SURVEYDATATRANSFERREQUEST.label()];
+    messageCallback(TEST_EMPTY_SURVEYDATATRANSFERREQUEST);
+
+    await tick(10);
   });
 
   it('opens dialog with scrolling disabled', async () => {
     const audienceActionFlow = new AudienceActionFlow(runtime, {
       action: 'TYPE_REGISTRATION_WALL',
+      configurationId: 'configId',
       onCancel: onCancelSpy,
       autoPromptType: AutoPromptType.SUBSCRIPTION,
     });
@@ -728,5 +1027,36 @@ describes.realWin('AudienceActionFlow', (env) => {
       .once();
     await audienceActionFlow.start();
     dialogManagerMock.verify();
+  });
+
+  it(`opens an AudienceActionFlow and passes isClosable in query param`, async () => {
+    sandbox.stub(runtime.storage(), 'get').resolves(null);
+    const audienceActionFlow = new AudienceActionFlow(runtime, {
+      action: 'TYPE_REWARDED_SURVEY',
+      configurationId: undefined,
+      onCancel: onCancelSpy,
+      autoPromptType: AutoPromptType.SUBSCRIPTION,
+      isClosable: true,
+    });
+    activitiesMock
+      .expects('openIframe')
+      .withExactArgs(
+        sandbox.match((arg) => arg.tagName == 'IFRAME'),
+        `https://news.google.com/swg/ui/v1/surveyiframe?_=_&origin=${encodeURIComponent(
+          WINDOW_LOCATION_DOMAIN
+        )}&configurationId=&hl=en&isClosable=true`,
+        {
+          _client: 'SwG 0.0.0',
+          productType: ProductType.SUBSCRIPTION,
+          supportsEventManager: true,
+          windowHeight: WINDOW_INNER_HEIGHT,
+        }
+      )
+      .resolves(port);
+
+    await audienceActionFlow.start();
+
+    activitiesMock.verify();
+    expect(onCancelSpy).to.not.be.called;
   });
 });

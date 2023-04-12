@@ -21,11 +21,11 @@ import {
   EventParams,
 } from '../proto/api_messages';
 import {ActivityIframeView} from '../ui/activity-iframe-view';
-import {ActivityPort} from '../components/activities';
 import {ClientConfig} from '../model/client-config';
 import {ConfiguredRuntime} from './runtime';
 import {Constants} from '../utils/constants';
 import {Entitlements} from '../api/entitlements';
+import {MockActivityPort} from '../../test/mock-activity-port';
 import {PageConfig} from '../model/page-config';
 import {PayClient} from './pay-client';
 import {
@@ -627,7 +627,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('pushNextEntitlements')
       .withExactArgs(sandbox.match((arg) => arg === RAW_ENTITLEMENTS))
       .once();
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     eventManagerMock
@@ -642,7 +642,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('openIframe')
       .withExactArgs(
         sandbox.match((arg) => arg.tagName == 'IFRAME'),
-        'https://news.google.com/swg/_/ui/v1/payconfirmiframe?_=_',
+        'https://news.google.com/swg/ui/v1/payconfirmiframe?_=_',
         {
           _client: 'SwG 0.0.0',
           publicationId: 'pub1',
@@ -669,7 +669,7 @@ describes.realWin('PayCompleteFlow', (env) => {
         .expects('pushNextEntitlements')
         .withExactArgs(sandbox.match((arg) => arg === RAW_ENTITLEMENTS))
         .once();
-      port = new ActivityPort();
+      port = new MockActivityPort();
       port.onResizeRequest = () => {};
       port.whenReady = () => Promise.resolve();
 
@@ -705,7 +705,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       ProductType.SUBSCRIPTION,
       null
     );
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     eventManagerMock
@@ -719,7 +719,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('openIframe')
       .withExactArgs(
         sandbox.match((arg) => arg.tagName == 'IFRAME'),
-        'https://news.google.com/swg/_/ui/v1/payconfirmiframe?_=_',
+        'https://news.google.com/swg/ui/v1/payconfirmiframe?_=_',
         {
           _client: 'SwG 0.0.0',
           publicationId: 'pub1',
@@ -749,7 +749,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       null,
       'sku_to_replace'
     );
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     eventManagerMock
@@ -763,7 +763,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('openIframe')
       .withExactArgs(
         sandbox.match((arg) => arg.tagName == 'IFRAME'),
-        'https://news.google.com/swg/_/ui/v1/payconfirmiframe?_=_',
+        'https://news.google.com/swg/ui/v1/payconfirmiframe?_=_',
         {
           _client: 'SwG 0.0.0',
           publicationId: 'pub1',
@@ -795,7 +795,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       null,
       2
     );
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     eventManagerMock
@@ -809,7 +809,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('openIframe')
       .withExactArgs(
         sandbox.match((arg) => arg.tagName == 'IFRAME'),
-        'https://news.google.com/swg/_/ui/v1/payconfirmiframe?_=_',
+        'https://news.google.com/swg/ui/v1/payconfirmiframe?_=_',
         {
           _client: 'SwG 0.0.0',
           publicationId: 'pub1',
@@ -851,7 +851,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('pushNextEntitlements')
       .withExactArgs(sandbox.match((arg) => arg === RAW_ENTITLEMENTS))
       .once();
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     eventManagerMock
@@ -866,7 +866,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('openIframe')
       .withExactArgs(
         sandbox.match((arg) => arg.tagName == 'IFRAME'),
-        'https://news.google.com/swg/_/ui/v1/payconfirmiframe?_=_',
+        'https://news.google.com/swg/ui/v1/payconfirmiframe?_=_',
         {
           _client: 'SwG 0.0.0',
           publicationId: 'pub1',
@@ -898,7 +898,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('pushNextEntitlements')
       .withExactArgs(sandbox.match((arg) => arg === RAW_ENTITLEMENTS))
       .once();
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     eventManagerMock
@@ -913,7 +913,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('openIframe')
       .withExactArgs(
         sandbox.match((arg) => arg.tagName == 'IFRAME'),
-        'https://news.google.com/swg/_/ui/v1/payconfirmiframe?_=_',
+        'https://news.google.com/swg/ui/v1/payconfirmiframe?_=_',
         {
           _client: 'SwG 0.0.0',
           publicationId: 'pub1',
@@ -943,7 +943,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('pushNextEntitlements')
       .withExactArgs(sandbox.match((arg) => arg === RAW_ENTITLEMENTS))
       .once();
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     eventManagerMock
@@ -958,7 +958,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('openIframe')
       .withExactArgs(
         sandbox.match((arg) => arg.tagName == 'IFRAME'),
-        'https://news.google.com/swg/_/ui/v1/payconfirmiframe?_=_',
+        'https://news.google.com/swg/ui/v1/payconfirmiframe?_=_',
         {
           _client: 'SwG 0.0.0',
           publicationId: 'pub1',
@@ -1011,7 +1011,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('pushNextEntitlements')
       .withExactArgs(sandbox.match((arg) => arg === RAW_ENTITLEMENTS))
       .once();
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     eventManagerMock
@@ -1028,7 +1028,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('openIframe')
       .withExactArgs(
         sandbox.match((arg) => arg.tagName == 'IFRAME'),
-        'https://news.google.com/swg/_/ui/v1/payconfirmiframe?_=_' +
+        'https://news.google.com/swg/ui/v1/payconfirmiframe?_=_' +
           '&productType=VIRTUAL_GIFT&publicationId=pub1&offerId=SKU&origin=' +
           expectedOrigin +
           '&isPaid=true&checkOrderStatus=true' +
@@ -1065,7 +1065,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('pushNextEntitlements')
       .withExactArgs(sandbox.match((arg) => arg === RAW_ENTITLEMENTS))
       .once();
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     eventManagerMock
@@ -1080,7 +1080,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       .expects('openIframe')
       .withExactArgs(
         sandbox.match((arg) => arg.tagName == 'IFRAME'),
-        'https://news.google.com/swg/_/ui/v1/payconfirmiframe?_=_&hl=fr-CA',
+        'https://news.google.com/swg/ui/v1/payconfirmiframe?_=_&hl=fr-CA',
         {
           _client: 'SwG 0.0.0',
           publicationId: 'pub1',
@@ -1099,7 +1099,7 @@ describes.realWin('PayCompleteFlow', (env) => {
 
   it('should complete the flow', async () => {
     const response = createDefaultSubscribeResponse();
-    const port = new ActivityPort();
+    const port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     port.acceptResult = () => Promise.resolve();
@@ -1144,7 +1144,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       )
       .once();
     const response = createDefaultSubscribeResponse();
-    const port = new ActivityPort();
+    const port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     port.acceptResult = () => Promise.resolve();
@@ -1185,7 +1185,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       ProductType.SUBSCRIPTION,
       null
     );
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     port.acceptResult = () => Promise.resolve();
@@ -1231,7 +1231,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       ProductType.SUBSCRIPTION,
       null
     );
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.on = (ctor, cb) => {
       const messageType = new ctor();
@@ -1313,7 +1313,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       ProductType.SUBSCRIPTION,
       null
     );
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     port.acceptResult = () => Promise.resolve();
@@ -1343,7 +1343,7 @@ describes.realWin('PayCompleteFlow', (env) => {
       ProductType.SUBSCRIPTION,
       null
     );
-    port = new ActivityPort();
+    port = new MockActivityPort();
     port.onResizeRequest = () => {};
     port.whenReady = () => Promise.resolve();
     port.acceptResult = () => Promise.resolve();

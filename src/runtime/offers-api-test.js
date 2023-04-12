@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-import {Fetcher} from './fetcher';
 import {OffersApi} from './offers-api';
 import {PageConfig} from '../model/page-config';
+import {XhrFetcher} from './fetcher';
 
-describes.realWin('OffersApi', () => {
+describes.realWin('OffersApi', (env) => {
   let offersApi;
   let pageConfig;
   let fetcherMock;
 
   beforeEach(() => {
     pageConfig = new PageConfig('pub1:label1');
-    const fetcher = new Fetcher();
+    const fetcher = new XhrFetcher(env.win);
     fetcherMock = sandbox.mock(fetcher);
     offersApi = new OffersApi(pageConfig, fetcher);
   });
@@ -71,5 +71,13 @@ describes.realWin('OffersApi', () => {
 
     const offers = await offersApi.getOffers();
     expect(offers).to.deep.equal([]);
+  });
+
+  it('rejects falsy offers', () => {
+    fetcherMock.expects('fetchCredentialedJson').never();
+
+    expect(() => offersApi.getOffers(false)).to.throw(
+      'getOffers requires productId in config or arguments'
+    );
   });
 });

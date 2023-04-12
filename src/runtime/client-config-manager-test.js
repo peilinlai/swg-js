@@ -18,10 +18,10 @@ import {AutoPromptConfig} from '../model/auto-prompt-config';
 import {ClientConfig} from '../model/client-config';
 import {ClientConfigManager} from './client-config-manager';
 import {ClientTheme} from '../api/basic-subscriptions';
-import {DepsDef} from './deps';
-import {Fetcher} from './fetcher';
+import {MockDeps} from '../../test/mock-deps';
+import {XhrFetcher} from './fetcher';
 
-describes.realWin('ClientConfigManager', () => {
+describes.realWin('ClientConfigManager', (env) => {
   let clientConfigManager;
   let fetcher;
   let fetcherMock;
@@ -30,8 +30,8 @@ describes.realWin('ClientConfigManager', () => {
   let entitlementsManagerMock;
 
   beforeEach(() => {
-    deps = new DepsDef();
-    fetcher = new Fetcher();
+    deps = new MockDeps();
+    fetcher = new XhrFetcher(env.win);
     fetcherMock = sandbox.mock(fetcher);
     depsMock = sandbox.mock(deps);
     entitlementsManagerMock = depsMock.expects('entitlementsManager').returns({
@@ -47,9 +47,7 @@ describes.realWin('ClientConfigManager', () => {
 
   it('getClientConfig should return default config', async () => {
     const clientConfig = await clientConfigManager.getClientConfig();
-    expect(clientConfig).to.deep.equal(
-      new ClientConfig({usePrefixedHostPath: true})
-    );
+    expect(clientConfig).to.deep.equal(new ClientConfig({}));
   });
 
   it('getClientConfig should include skipAccountCreation override if specified', async () => {
@@ -60,7 +58,6 @@ describes.realWin('ClientConfigManager', () => {
     expect(clientConfig).to.deep.equal(
       new ClientConfig({
         skipAccountCreationScreen: true,
-        usePrefixedHostPath: true,
       })
     );
   });
@@ -132,7 +129,7 @@ describes.realWin('ClientConfigManager', () => {
         new Promise((resolve) => {
           sequence++;
           resolve({
-            clientConfig: new ClientConfig(),
+            clientConfig: new ClientConfig({}),
           });
         }),
     });
@@ -227,23 +224,6 @@ describes.realWin('ClientConfigManager', () => {
     ).to.equal(8);
   });
 
-  it('fetchClientConfig should log errors from the response', async () => {
-    const expectedUrl =
-      'https://news.google.com/swg/_/api/v1/publication/pubId/clientconfiguration';
-    fetcherMock
-      .expects('fetchCredentialedJson')
-      .withExactArgs(expectedUrl)
-      .resolves({
-        errorMessages: ['Something went wrong'],
-      })
-      .once();
-
-    await clientConfigManager.getAutoPromptConfig();
-    expect(self.console.warn).to.have.been.calledWithExactly(
-      'SwG ClientConfigManager: Something went wrong'
-    );
-  });
-
   it('getClientConfig should return a Promise with an empty config if fetchClientConfig is not called', async () => {
     const clientConfig = await clientConfigManager.getClientConfig();
     const expectedClientConfig = new ClientConfig({usePrefixedHostPath: true});
@@ -253,6 +233,18 @@ describes.realWin('ClientConfigManager', () => {
   it('should return default client options if unspecified', () => {
     expect(clientConfigManager.getLanguage()).to.equal('en');
     expect(clientConfigManager.getTheme()).to.equal(ClientTheme.LIGHT);
+  });
+
+  it('should default theme to dark if the user prefers it', () => {
+    const mockMatchMedia = sandbox
+      .mock(self, 'matchMedia')
+      .expects('matchMedia')
+      .withExactArgs('(prefers-color-scheme: dark)')
+      .returns({matches: true});
+
+    expect(clientConfigManager.getTheme()).to.equal(ClientTheme.DARK);
+
+    mockMatchMedia.verify();
   });
 
   it('should return the language set in the constructor', () => {
